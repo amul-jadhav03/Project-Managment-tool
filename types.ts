@@ -21,6 +21,8 @@ export interface Resource {
   capacity: number; // Hours available per day
   weeklyCapacity?: number; // Hours available per week
   skills: string[];
+  isBillable: boolean;
+  billingRate?: number;
 }
 
 export interface TaskHistoryItem {

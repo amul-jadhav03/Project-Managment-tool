@@ -5,6 +5,12 @@ export enum TaskStatus {
   BLOCKED = 'Blocked'
 }
 
+export interface PriorityConfig {
+  label: string;
+  color: string;
+  textColor: string;
+}
+
 export interface Resource {
   id: string;
   name: string;
@@ -13,6 +19,8 @@ export interface Resource {
   email?: string;
   avatarUrl?: string;
   capacity: number; // Hours available per day
+  weeklyCapacity?: number; // Hours available per week
+  skills: string[];
 }
 
 export interface Task {
@@ -24,13 +32,25 @@ export interface Task {
   date: string; // ISO Date string YYYY-MM-DD
   duration: number; // Hours
   status: TaskStatus;
-  priority: 'Low' | 'Medium' | 'High';
+  priority: string;
+  requiredSkills?: string[];
+}
+
+export interface Leave {
+  id: string;
+  resourceId: string;
+  date: string; // ISO Date string YYYY-MM-DD
+  reason: string;
+  type: 'Sick' | 'Vacation' | 'Personal' | 'Other';
+  status: 'Approved' | 'Pending';
 }
 
 export interface AppState {
   resources: Resource[];
   tasks: Task[];
+  leaves: Leave[];
   projects: string[];
+  priorityConfigs: PriorityConfig[];
   isLoading: boolean;
   error: string | null;
 }
@@ -41,4 +61,5 @@ export interface FilterState {
   role: string;
   department: string;
   search: string;
+  skill: string;
 }

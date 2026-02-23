@@ -78,6 +78,16 @@ export const TeamView: React.FC<TeamViewProps> = ({ resources }) => {
                     <span className="truncate">{resource.email || `${resource.name.toLowerCase().replace(/[^a-z0-9]/g, '.')}@nova.task`}</span>
                   </div>
                 </div>
+
+                {resource.skills && resource.skills.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-1">
+                    {resource.skills.map(skill => (
+                      <span key={skill} className="px-1.5 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded border border-indigo-100 uppercase tracking-tight">
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 
                 <div className="mt-4 pt-3 border-t border-slate-50 flex justify-between items-center text-xs">
                     <span className="text-slate-400">Daily Capacity</span>

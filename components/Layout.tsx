@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { LayoutDashboard, FolderKanban, Users, Settings, Bell, Search, Sparkles, CheckSquare, PieChart } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, Users, Settings, Bell, Search, Sparkles, CheckSquare, PieChart, Coffee, Clock } from 'lucide-react';
 
 interface LayoutProps {
   children: ReactNode;
@@ -61,8 +61,20 @@ export const Layout: React.FC<LayoutProps> = ({ children, onAIRequest, currentVi
           <NavItem 
             icon={<Users size={20} />} 
             label="Team" 
-            active={currentView === 'team'}
+            active={currentView === 'team'} 
             onClick={() => onNavigate('team')}
+          />
+          <NavItem 
+            icon={<Clock size={20} />} 
+            label="Capacity" 
+            active={currentView === 'capacity'}
+            onClick={() => onNavigate('capacity')}
+          />
+           <NavItem 
+            icon={<Coffee size={20} />} 
+            label="Leave Status" 
+            active={currentView === 'leaves'}
+            onClick={() => onNavigate('leaves')}
           />
           
           <div className="mt-auto pt-6 pb-4">
@@ -97,7 +109,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onAIRequest, currentVi
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 z-10 shrink-0 shadow-sm">
           <div className="flex items-center gap-4 flex-1">
             <h2 className="text-lg font-semibold text-slate-800 capitalize hidden sm:block">
-                {currentView}
+                {currentView.replace('-', ' ')}
             </h2>
             <div className="h-6 w-px bg-slate-200 hidden sm:block mx-2"></div>
             <div className="relative w-full max-w-md">

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { X, Calendar, Clock, CheckCircle2, AlertCircle, Circle, Briefcase, Pencil, Save } from 'lucide-react';
-import { Resource, Task, TaskStatus } from '../types';
+import { Resource, Task, TaskStatus, PriorityConfig } from '../types';
 
 interface ResourceDetailsModalProps {
   isOpen: boolean;
@@ -10,10 +10,11 @@ interface ResourceDetailsModalProps {
   tasks: Task[];
   date: Date;
   onUpdateTask: (task: Task) => void;
+  priorityConfigs: PriorityConfig[];
 }
 
 export const ResourceDetailsModal: React.FC<ResourceDetailsModalProps> = ({ 
-  isOpen, onClose, resource, tasks, date, onUpdateTask
+  isOpen, onClose, resource, tasks, date, onUpdateTask, priorityConfigs
 }) => {
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Partial<Task>>({});
@@ -35,7 +36,8 @@ export const ResourceDetailsModal: React.FC<ResourceDetailsModalProps> = ({
       title: task.title,
       description: task.description,
       duration: task.duration,
-      status: task.status
+      status: task.status,
+      priority: task.priority
     });
   };
 
@@ -156,6 +158,16 @@ export const ResourceDetailsModal: React.FC<ResourceDetailsModalProps> = ({
                             />
                         </div>
                         <div className="flex-1">
+                            <label className="text-xs font-semibold text-slate-500 uppercase">Priority</label>
+                            <select
+                                value={editValues.priority}
+                                onChange={e => setEditValues({...editValues, priority: e.target.value})}
+                                className="w-full text-sm border border-slate-200 rounded p-2 mt-1 bg-white"
+                            >
+                                {priorityConfigs.map(p => <option key={p.label} value={p.label}>{p.label}</option>)}
+                            </select>
+                        </div>
+                        <div className="flex-1">
                             <label className="text-xs font-semibold text-slate-500 uppercase">Status</label>
                             <select
                                 value={editValues.status}
@@ -211,12 +223,17 @@ export const ResourceDetailsModal: React.FC<ResourceDetailsModalProps> = ({
                             {task.projectName}
                         </span>
                     </div>
-                    <span className={`font-medium px-2 py-1 rounded ${
-                        task.priority === 'High' ? 'bg-red-50 text-red-600' : 
-                        task.priority === 'Medium' ? 'bg-amber-50 text-amber-600' : 'bg-green-50 text-green-600'
-                    }`}>
-                        {task.priority}
-                    </span>
+                    {(() => {
+                        const config = priorityConfigs.find(p => p.label === task.priority) || priorityConfigs[0];
+                        return (
+                            <span 
+                                className="font-bold px-2 py-1 rounded shadow-sm border border-black/5"
+                                style={{ backgroundColor: config?.color || '#f1f5f9', color: config?.textColor || '#475569' }}
+                            >
+                                {task.priority}
+                            </span>
+                        );
+                    })()}
                     </div>
                 </div>
               )

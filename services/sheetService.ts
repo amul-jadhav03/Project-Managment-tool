@@ -1,51 +1,56 @@
-import { Resource, Task, TaskStatus } from '../types';
+import { Resource, Task, TaskStatus, Leave, PriorityConfig } from '../types';
+import Papa from 'papaparse';
 
-// The ID from the user provided URL: https://docs.google.com/spreadsheets/d/1ABC0KX7P220ODjWXI_JDbzqsVXLH4R8jwOrXvrKsoW8/edit?gid=0#gid=0
+// The ID from the user provided URL
 const SHEET_ID = '1ABC0KX7P220ODjWXI_JDbzqsVXLH4R8jwOrXvrKsoW8';
 const SHEET_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
 
-export const fetchSheetData = async (): Promise<{ resources: Resource[], tasks: Task[] }> => {
+export const fetchSheetData = async (): Promise<{ resources: Resource[], tasks: Task[], leaves: Leave[], priorityConfigs: PriorityConfig[] }> => {
+  // Prevent network errors if the Sheet ID is still the default placeholder
+  if (SHEET_ID === '1ABC0KX7P220ODjWXI_JDbzqsVXLH4R8jwOrXvrKsoW8') {
+    console.info("Using mock data (Sheet ID is configured to placeholder).");
+    return getMockData();
+  }
+
   try {
     const response = await fetch(SHEET_CSV_URL);
     if (!response.ok) {
       throw new Error(`Failed to fetch sheet: ${response.statusText}`);
     }
     const text = await response.text();
-    return parseCSV(text);
+    const parsed = parseCSVData(text);
+    return { ...parsed, leaves: getMockLeaves(), priorityConfigs: getDefaultPriorityConfigs() };
   } catch (error) {
     console.warn("Using mock data due to fetch error (likely CORS or private sheet):", error);
     return getMockData();
   }
 };
 
-const parseCSV = (csvText: string): { resources: Resource[], tasks: Task[] } => {
-  const lines = csvText.split('\n');
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-  
+export const getDefaultPriorityConfigs = (): PriorityConfig[] => [
+  { label: 'Urgent', color: '#ef4444', textColor: '#ffffff' },
+  { label: 'High', color: '#f97316', textColor: '#ffffff' },
+  { label: 'Medium', color: '#eab308', textColor: '#ffffff' },
+  { label: 'Low', color: '#3b82f6', textColor: '#ffffff' },
+];
+
+const parseCSVData = (csvText: string): { resources: Resource[], tasks: Task[] } => {
+  const result = Papa.parse(csvText, {
+    header: true,
+    skipEmptyLines: true,
+    transformHeader: (h) => h.trim().toLowerCase()
+  });
+
+  const data = result.data as any[];
   const resourcesMap = new Map<string, Resource>();
   const tasks: Task[] = [];
 
-  // Simple CSV parser logic (assuming no complex quoting for this demo)
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-    
-    // Handle simple CSV splitting
-    const values = line.split(',').map(v => v.trim());
-    const row: any = {};
-    headers.forEach((h, index) => {
-      // Clean up headers to handle potential quotes or extra spaces
-      const key = h.replace(/^"|"$/g, '').trim();
-      row[key] = (values[index] || '').replace(/^"|"$/g, '').trim();
-    });
-
-    // Map columns to our domain model. 
+  data.forEach((row, index) => {
     // Robust checks for Resource Name columns
     const resourceName = row['name'] || row['resource'] || row['resource name'] || row['employee'] || row['team member'] || 'Unknown';
     const resourceId = resourceName.toLowerCase().replace(/\s+/g, '-');
     
-    // Skip invalid rows where name is strictly Unknown AND task is empty (likely empty rows)
-    if (resourceName === 'Unknown' && !row['task'] && !row['title']) continue;
+    // Skip invalid rows
+    if (resourceName === 'Unknown' && !row['task'] && !row['title']) return;
 
     // Build Resource List
     if (!resourcesMap.has(resourceId)) {
@@ -55,29 +60,39 @@ const parseCSV = (csvText: string): { resources: Resource[], tasks: Task[] } => 
         role: row['role'] || row['job title'] || 'Team Member',
         department: row['department'] || 'Engineering',
         capacity: 8,
+        weeklyCapacity: 40,
+        skills: (row['skills'] || '').split(',').map((s: string) => s.trim()).filter(Boolean),
         avatarUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(resourceName)}&background=random`
       });
     }
 
     // Build Task List
     tasks.push({
-      id: `task-${i}`,
+      id: `task-${index}`,
       title: row['task'] || row['title'] || 'Untitled Task',
       description: row['description'] || '',
       assignedResourceId: resourceId,
       projectName: row['project'] || 'General',
-      date: row['date'] || new Date().toISOString().split('T')[0], // Fallback to today if missing
+      date: parseDate(row['date']), 
       duration: parseFloat(row['hours'] || row['duration'] || '0') || 1,
       status: mapStatus(row['status']),
-      priority: 'Medium'
+      priority: 'Medium',
+      requiredSkills: (row['required skills'] || row['skills'] || '').split(',').map((s: string) => s.trim()).filter(Boolean)
     });
-  }
+  });
 
   return {
     resources: Array.from(resourcesMap.values()),
     tasks
   };
 };
+
+const parseDate = (dateString: string): string => {
+  if (!dateString) return new Date().toISOString().split('T')[0];
+  // Handle formats like DD/MM/YYYY or MM/DD/YYYY if necessary, currently assumes ISO or standard
+  const d = new Date(dateString);
+  return !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+}
 
 const mapStatus = (status: string): TaskStatus => {
   const s = status?.toLowerCase() || '';
@@ -87,26 +102,36 @@ const mapStatus = (status: string): TaskStatus => {
   return TaskStatus.TODO;
 };
 
+const getMockLeaves = (): Leave[] => {
+  const today = new Date().toISOString().split('T')[0];
+  return [
+    { id: 'l1', resourceId: 'mike-ross', date: today, reason: 'Doctor Appointment', type: 'Sick', status: 'Approved' },
+  ];
+};
+
 // Fallback data if the sheet is inaccessible
 const getMockData = () => {
   const resources: Resource[] = [
-    { id: 'alex-chen', name: 'Alex Chen', role: 'Senior Dev', department: 'Frontend', capacity: 8, avatarUrl: 'https://i.pravatar.cc/150?u=alex' },
-    { id: 'sarah-jones', name: 'Sarah Jones', role: 'Product Manager', department: 'Product', capacity: 8, avatarUrl: 'https://i.pravatar.cc/150?u=sarah' },
-    { id: 'mike-ross', name: 'Mike Ross', role: 'UX Designer', department: 'Design', capacity: 6, avatarUrl: 'https://i.pravatar.cc/150?u=mike' },
-    { id: 'emily-wong', name: 'Emily Wong', role: 'Backend Dev', department: 'Backend', capacity: 8, avatarUrl: 'https://i.pravatar.cc/150?u=emily' },
+    { id: 'alex-chen', name: 'Alex Chen', role: 'Senior Dev', department: 'Frontend', capacity: 8, weeklyCapacity: 40, skills: ['React', 'TypeScript', 'Tailwind'], avatarUrl: 'https://i.pravatar.cc/150?u=alex' },
+    { id: 'sarah-jones', name: 'Sarah Jones', role: 'Product Manager', department: 'Product', capacity: 8, weeklyCapacity: 40, skills: ['Roadmapping', 'Agile', 'Communication'], avatarUrl: 'https://i.pravatar.cc/150?u=sarah' },
+    { id: 'mike-ross', name: 'Mike Ross', role: 'UX Designer', department: 'Design', capacity: 6, weeklyCapacity: 30, skills: ['Figma', 'User Research', 'Prototyping'], avatarUrl: 'https://i.pravatar.cc/150?u=mike' },
+    { id: 'emily-wong', name: 'Emily Wong', role: 'Backend Dev', department: 'Backend', capacity: 8, weeklyCapacity: 40, skills: ['Node.js', 'PostgreSQL', 'Docker'], avatarUrl: 'https://i.pravatar.cc/150?u=emily' },
   ];
 
   const today = new Date().toISOString().split('T')[0];
   const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 
   const tasks: Task[] = [
-    { id: '1', title: 'Q3 Roadmap Review', assignedResourceId: 'sarah-jones', projectName: 'Strategy', date: today, duration: 2, status: TaskStatus.COMPLETED, priority: 'High' },
-    { id: '2', title: 'Fix Login Bug', assignedResourceId: 'alex-chen', projectName: 'Auth Service', date: today, duration: 4, status: TaskStatus.IN_PROGRESS, priority: 'High' },
-    { id: '3', title: 'Design System Update', assignedResourceId: 'mike-ross', projectName: 'UI Kit', date: today, duration: 3, status: TaskStatus.TODO, priority: 'Medium' },
-    { id: '4', title: 'API Schema Migration', assignedResourceId: 'emily-wong', projectName: 'Core API', date: today, duration: 5, status: TaskStatus.IN_PROGRESS, priority: 'High' },
-    { id: '5', title: 'Sprint Planning', assignedResourceId: 'sarah-jones', projectName: 'Operations', date: tomorrow, duration: 1.5, status: TaskStatus.TODO, priority: 'Medium' },
-    { id: '6', title: 'Code Review', assignedResourceId: 'alex-chen', projectName: 'Auth Service', date: today, duration: 1, status: TaskStatus.TODO, priority: 'Low' },
+    { id: '1', title: 'Q3 Roadmap Review', assignedResourceId: 'sarah-jones', projectName: 'Strategy', date: today, duration: 2, status: TaskStatus.COMPLETED, priority: 'High', requiredSkills: ['Roadmapping'] },
+    { id: '2', title: 'Fix Login Bug', assignedResourceId: 'alex-chen', projectName: 'Auth Service', date: today, duration: 4, status: TaskStatus.IN_PROGRESS, priority: 'High', requiredSkills: ['TypeScript', 'React'] },
+    { id: '3', title: 'Design System Update, Colors & Typography', assignedResourceId: 'mike-ross', projectName: 'UI Kit', date: today, duration: 3, status: TaskStatus.TODO, priority: 'Medium', requiredSkills: ['Figma'] },
+    { id: '4', title: 'API Schema Migration', assignedResourceId: 'emily-wong', projectName: 'Core API', date: today, duration: 5, status: TaskStatus.IN_PROGRESS, priority: 'High', requiredSkills: ['PostgreSQL', 'Node.js'] },
+    { id: '5', title: 'Sprint Planning', assignedResourceId: 'sarah-jones', projectName: 'Operations', date: tomorrow, duration: 1.5, status: TaskStatus.TODO, priority: 'Medium', requiredSkills: ['Agile'] },
+    { id: '6', title: 'Code Review', assignedResourceId: 'alex-chen', projectName: 'Auth Service', date: today, duration: 1, status: TaskStatus.TODO, priority: 'Low', requiredSkills: ['TypeScript'] },
   ];
 
-  return { resources, tasks };
+  const leaves = getMockLeaves();
+  const priorityConfigs = getDefaultPriorityConfigs();
+
+  return { resources, tasks, leaves, priorityConfigs };
 };

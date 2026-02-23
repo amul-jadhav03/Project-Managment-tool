@@ -1,22 +1,29 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { format, isSameDay, parseISO } from 'date-fns';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
-import { Filter, Calendar as CalendarIcon, RefreshCw, Construction, Briefcase, Users, LayoutList, Layers, CheckSquare, ArrowRight } from 'lucide-react';
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Calendar as CalendarIcon, RefreshCw, Construction, Layers, CheckSquare, ArrowRight, LayoutList, Users } from 'lucide-react';
 
 import { Layout } from './components/Layout';
 import { ResourceCard } from './components/ResourceCard';
 import { TeamView } from './components/TeamView';
 import { ProjectsView } from './components/ProjectsView';
+import { ReportsView } from './components/ReportsView';
+import { LeavesView } from './components/LeavesView';
+import { CapacityPlanningView } from './components/CapacityPlanningView';
+import { SettingsView } from './components/SettingsView';
+import { TasksView } from './components/TasksView';
 import { AIAssistantModal } from './components/AIAssistantModal';
 import { ResourceDetailsModal } from './components/ResourceDetailsModal';
 import { fetchSheetData } from './services/sheetService';
-import { AppState, FilterState, Resource, Task, TaskStatus } from './types';
+import { AppState, FilterState, Resource, Task, TaskStatus, Leave, PriorityConfig } from './types';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
     resources: [],
     tasks: [],
+    leaves: [],
     projects: [],
+    priorityConfigs: [],
     isLoading: true,
     error: null,
   });
@@ -27,19 +34,19 @@ const App: React.FC = () => {
     role: 'All',
     department: 'All',
     search: '',
+    skill: 'All',
   });
 
   const [currentView, setCurrentView] = useState('dashboard');
   const [isAIModalOpen, setAIModalOpen] = useState(false);
   const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
-  const [resourceSort, setResourceSort] = useState<'name' | 'role' | 'department'>('name');
 
   // Load Data
   useEffect(() => {
     const loadData = async () => {
       setState(prev => ({ ...prev, isLoading: true }));
       try {
-        const { resources, tasks } = await fetchSheetData();
+        const { resources, tasks, leaves, priorityConfigs } = await fetchSheetData();
         
         // Extract unique projects
         const uniqueProjects = Array.from(new Set(tasks.map(t => t.projectName))).sort();
@@ -47,7 +54,9 @@ const App: React.FC = () => {
         setState({
           resources,
           tasks,
+          leaves,
           projects: ['All', ...uniqueProjects],
+          priorityConfigs,
           isLoading: false,
           error: null,
         });
@@ -63,13 +72,17 @@ const App: React.FC = () => {
   }, []);
 
   // Filter Options
-  const uniqueRoles = useMemo(() => ['All', ...Array.from(new Set(state.resources.map(r => r.role))).sort()], [state.resources]);
   const uniqueDepartments = useMemo(() => ['All', ...Array.from(new Set(state.resources.map(r => r.department))).sort()], [state.resources]);
+
+  const uniqueSkills = useMemo(() => {
+    const skills = new Set<string>();
+    state.resources.forEach(r => r.skills?.forEach(s => skills.add(s)));
+    state.tasks.forEach(t => t.requiredSkills?.forEach(s => skills.add(s)));
+    return ['All', ...Array.from(skills).sort()];
+  }, [state.resources, state.tasks]);
 
   // Project Aggregation Logic
   const projectMetrics = useMemo(() => {
-    // We only filter by date for the "Daily" view, but for Project Overview, we want global stats (or filtered by date range if we had one)
-    // For now, let's show ALL tasks statistics for the projects
     return state.projects.filter(p => p !== 'All').map(projectName => {
       const projTasks = state.tasks.filter(t => t.projectName === projectName);
       const completed = projTasks.filter(t => t.status === TaskStatus.COMPLETED).length;
@@ -93,22 +106,25 @@ const App: React.FC = () => {
     return state.resources.filter(resource => {
       const roleMatch = filters.role === 'All' || resource.role === filters.role;
       const deptMatch = filters.department === 'All' || resource.department === filters.department;
-      return roleMatch && deptMatch;
+      const skillMatch = filters.skill === 'All' || resource.skills?.includes(filters.skill);
+      return roleMatch && deptMatch && skillMatch;
     });
-  }, [state.resources, filters.role, filters.department]);
+  }, [state.resources, filters.role, filters.department, filters.skill]);
 
   const filteredTasks = useMemo(() => {
     return state.tasks.filter(task => {
       const taskDate = parseISO(task.date);
       const isDateMatch = isSameDay(taskDate, filters.date);
       const isProjectMatch = filters.project === 'All' || task.projectName === filters.project;
+      const isSkillMatch = filters.skill === 'All' || task.requiredSkills?.includes(filters.skill);
       
       const resource = state.resources.find(r => r.id === task.assignedResourceId);
       if (!resource) return false;
       const isRoleMatch = filters.role === 'All' || resource.role === filters.role;
       const isDeptMatch = filters.department === 'All' || resource.department === filters.department;
+      const isResourceSkillMatch = filters.skill === 'All' || resource.skills?.includes(filters.skill);
 
-      return isDateMatch && isProjectMatch && isRoleMatch && isDeptMatch;
+      return isDateMatch && isProjectMatch && isRoleMatch && isDeptMatch && isSkillMatch && isResourceSkillMatch;
     });
   }, [state.tasks, state.resources, filters]);
 
@@ -154,6 +170,32 @@ const App: React.FC = () => {
     }));
   };
 
+  const handleAddLeave = (newLeave: Leave) => {
+      setState(prev => ({
+          ...prev,
+          leaves: [...prev.leaves, newLeave]
+      }));
+  };
+
+  const handleUpdateResource = (updatedResource: Resource) => {
+    setState(prev => ({
+      ...prev,
+      resources: prev.resources.map(r => r.id === updatedResource.id ? updatedResource : r)
+    }));
+  };
+
+  const handleUpdatePriorities = (configs: PriorityConfig[]) => {
+    setState(prev => ({
+      ...prev,
+      priorityConfigs: configs
+    }));
+  };
+
+  const isResourceOnLeave = (resourceId: string, date: Date) => {
+      const dateStr = format(date, 'yyyy-MM-dd');
+      return state.leaves.some(l => l.resourceId === resourceId && l.date === dateStr);
+  };
+
   if (state.isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-50">
@@ -173,8 +215,24 @@ const App: React.FC = () => {
     >
       {currentView === 'team' ? (
         <TeamView resources={state.resources} />
+      ) : currentView === 'capacity' ? (
+        <CapacityPlanningView 
+          resources={state.resources} 
+          tasks={state.tasks} 
+          projects={state.projects}
+          onUpdateResource={handleUpdateResource} 
+          priorityConfigs={state.priorityConfigs}
+        />
       ) : currentView === 'projects' ? (
         <ProjectsView tasks={state.tasks} resources={state.resources} />
+      ) : currentView === 'tasks' ? (
+        <TasksView tasks={state.tasks} resources={state.resources} priorityConfigs={state.priorityConfigs} />
+      ) : currentView === 'reports' ? (
+        <ReportsView tasks={state.tasks} resources={state.resources} />
+      ) : currentView === 'leaves' ? (
+        <LeavesView leaves={state.leaves} resources={state.resources} onAddLeave={handleAddLeave} />
+      ) : currentView === 'settings' ? (
+        <SettingsView priorityConfigs={state.priorityConfigs} onUpdatePriorities={handleUpdatePriorities} />
       ) : currentView === 'dashboard' ? (
         <div className="max-w-7xl mx-auto pb-10 space-y-8">
           
@@ -280,15 +338,18 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="bg-indigo-900 rounded-xl shadow-sm p-6 text-white relative overflow-hidden">
+                <div 
+                  onClick={() => setCurrentView('reports')}
+                  className="bg-indigo-900 rounded-xl shadow-sm p-6 text-white relative overflow-hidden cursor-pointer hover:bg-indigo-800 transition-colors group"
+                >
                     <div className="relative z-10">
-                        <h3 className="font-bold text-lg mb-2">Weekly Report</h3>
-                        <p className="text-indigo-200 text-sm mb-4">Generate a summary of project velocity and resource utilization.</p>
+                        <h3 className="font-bold text-lg mb-2">Project Reports</h3>
+                        <p className="text-indigo-200 text-sm mb-4">Generate weekly or monthly summaries of project velocity and resource utilization.</p>
                         <button className="text-xs bg-white text-indigo-900 font-bold px-3 py-2 rounded-lg flex items-center gap-1 hover:bg-indigo-50">
                             Generate PDF <ArrowRight size={12} />
                         </button>
                     </div>
-                    <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-indigo-700 rounded-full opacity-50"></div>
+                    <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-indigo-700 rounded-full opacity-50 group-hover:scale-110 transition-transform"></div>
                     <div className="absolute top-4 right-4 text-indigo-500 opacity-20">
                         <Layers size={64} />
                     </div>
@@ -330,10 +391,17 @@ const App: React.FC = () => {
                    >
                        {uniqueDepartments.map(d => <option key={d} value={d}>{d === 'All' ? 'All Depts' : d}</option>)}
                    </select>
+                   <select 
+                       value={filters.skill}
+                       onChange={(e) => setFilters(prev => ({ ...prev, skill: e.target.value }))}
+                       className="text-xs font-medium text-slate-600 bg-transparent border-none focus:outline-none cursor-pointer hover:text-indigo-600"
+                   >
+                       {uniqueSkills.map(s => <option key={s} value={s}>{s === 'All' ? 'All Skills' : s}</option>)}
+                   </select>
                </div>
             </div>
 
-            {filteredTasks.length === 0 && filters.project === 'All' ? (
+            {filteredTasks.length === 0 && filters.project === 'All' && !filteredResources.some(r => isResourceOnLeave(r.id, filters.date)) ? (
                 <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
                   <p className="text-slate-500">No tasks scheduled for {format(filters.date, 'MMM do')}.</p>
                 </div>
@@ -341,13 +409,16 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {filteredResources.map(resource => {
                     const tasksForResource = getTasksForResource(resource.id);
-                    if (filters.project !== 'All' && tasksForResource.length === 0) return null;
+                    const onLeave = isResourceOnLeave(resource.id, filters.date);
+
+                    if (filters.project !== 'All' && tasksForResource.length === 0 && !onLeave) return null;
                     return (
                       <ResourceCard 
                         key={resource.id} 
                         resource={resource} 
                         tasks={tasksForResource} 
                         onClick={() => setSelectedResource(resource)}
+                        isOnLeave={onLeave}
                       />
                     );
                   })}
@@ -378,6 +449,7 @@ const App: React.FC = () => {
         tasks={selectedResource ? getTasksForResource(selectedResource.id) : []}
         date={filters.date}
         onUpdateTask={handleUpdateTask}
+        priorityConfigs={state.priorityConfigs}
       />
     </Layout>
   );

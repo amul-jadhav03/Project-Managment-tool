@@ -1,14 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import { Resource } from '../types';
-import { Mail, Briefcase, Users, ArrowUpDown } from 'lucide-react';
+import { Mail, Briefcase, Users, ArrowUpDown, Tag } from 'lucide-react';
 
 interface TeamViewProps {
   resources: Resource[];
+  onNavigate?: (view: string) => void;
 }
 
 type SortOption = 'name' | 'role' | 'department';
 
-export const TeamView: React.FC<TeamViewProps> = ({ resources }) => {
+export const TeamView: React.FC<TeamViewProps> = ({ resources, onNavigate }) => {
   const [sortBy, setSortBy] = useState<SortOption>('name');
 
   const sortedResources = useMemo(() => {
@@ -28,6 +29,14 @@ export const TeamView: React.FC<TeamViewProps> = ({ resources }) => {
         </div>
         
         <div className="flex items-center gap-3">
+            {onNavigate && (
+              <button 
+                onClick={() => onNavigate('skills-matrix')}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-bold border border-indigo-100 hover:bg-indigo-100 transition-colors mr-2"
+              >
+                <Tag size={16} /> Skills Matrix
+              </button>
+            )}
             <span className="text-sm text-slate-500 font-medium flex items-center gap-1">
               <ArrowUpDown size={14} /> Sort by:
             </span>

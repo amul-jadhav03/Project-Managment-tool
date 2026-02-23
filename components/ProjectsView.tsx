@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Task, Resource, TaskStatus } from '../types';
 import { format, parseISO } from 'date-fns';
 import { Calendar, Users, Clock, AlertCircle, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { ProjectDetailsModal } from './ProjectDetailsModal';
 
 interface ProjectsViewProps {
   tasks: Task[];
@@ -10,6 +11,8 @@ interface ProjectsViewProps {
 }
 
 export const ProjectsView: React.FC<ProjectsViewProps> = ({ tasks, resources, onProjectSelect }) => {
+  const [selectedProject, setSelectedProject] = useState<any | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   
   const projects = useMemo(() => {
     const uniqueProjects = Array.from(new Set(tasks.map(t => t.projectName))).sort();
@@ -53,6 +56,11 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ tasks, resources, on
       };
     });
   }, [tasks, resources]);
+
+  const handleViewDetails = (project: any) => {
+    setSelectedProject(project);
+    setIsModalOpen(true);
+  };
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -151,7 +159,10 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ tasks, resources, on
                    </div>
                 </div>
 
-                <button className="w-full mt-4 flex items-center justify-center gap-2 text-xs font-medium bg-white border border-slate-200 hover:border-indigo-300 hover:text-indigo-600 py-2 rounded-lg transition-colors">
+                <button 
+                  onClick={() => handleViewDetails(project)}
+                  className="w-full mt-4 flex items-center justify-center gap-2 text-xs font-medium bg-white border border-slate-200 hover:border-indigo-300 hover:text-indigo-600 py-2 rounded-lg transition-colors"
+                >
                   View Details <ArrowRight size={12} />
                 </button>
               </div>
@@ -160,6 +171,13 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ tasks, resources, on
           </div>
         ))}
       </div>
+
+      <ProjectDetailsModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        project={selectedProject} 
+        tasks={tasks}
+      />
     </div>
   );
 };

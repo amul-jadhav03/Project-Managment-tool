@@ -1,14 +1,32 @@
-import React, { ReactNode } from 'react';
-import { LayoutDashboard, FolderKanban, Users, Settings, Bell, Search, Sparkles, CheckSquare, PieChart, Coffee, Clock } from 'lucide-react';
+import React, { ReactNode, useState } from 'react';
+import { LayoutDashboard, FolderKanban, Users, Settings, Bell, Search, Sparkles, CheckSquare, PieChart, Coffee, Clock, Tag } from 'lucide-react';
+import { Notification } from '../types';
+import { NotificationCenter } from './NotificationCenter';
 
 interface LayoutProps {
   children: ReactNode;
   onAIRequest: () => void;
   currentView: string;
   onNavigate: (view: string) => void;
+  notifications: Notification[];
+  onMarkAsRead: (id: string) => void;
+  onMarkAllAsRead: () => void;
+  onClearAll: () => void;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children, onAIRequest, currentView, onNavigate }) => {
+export const Layout: React.FC<LayoutProps> = ({ 
+  children, 
+  onAIRequest, 
+  currentView, 
+  onNavigate,
+  notifications,
+  onMarkAsRead,
+  onMarkAllAsRead,
+  onClearAll
+}) => {
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const unreadCount = notifications.filter(n => !n.read).length;
+
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden">
       {/* Sidebar - Fixed with Hover Expansion */}
@@ -63,6 +81,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, onAIRequest, currentVi
             label="Team" 
             active={currentView === 'team'} 
             onClick={() => onNavigate('team')}
+          />
+          <NavItem 
+            icon={<Tag size={20} />} 
+            label="Skills Matrix" 
+            active={currentView === 'skills-matrix'} 
+            onClick={() => onNavigate('skills-matrix')}
           />
           <NavItem 
             icon={<Clock size={20} />} 
@@ -122,10 +146,30 @@ export const Layout: React.FC<LayoutProps> = ({ children, onAIRequest, currentVi
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <button className="relative p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
-              <Bell size={20} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
-            </button>
+            <div className="relative">
+              <button 
+                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                className={`relative p-2 rounded-lg transition-colors ${
+                  isNotificationsOpen ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <Bell size={20} />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border border-white">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+              
+              <NotificationCenter 
+                notifications={notifications}
+                onMarkAsRead={onMarkAsRead}
+                onMarkAllAsRead={onMarkAllAsRead}
+                onClearAll={onClearAll}
+                isOpen={isNotificationsOpen}
+                onClose={() => setIsNotificationsOpen(false)}
+              />
+            </div>
             <div className="flex items-center gap-2">
                 <div className="text-right hidden md:block">
                     <div className="text-sm font-medium text-slate-900">Alex Manager</div>

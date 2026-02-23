@@ -10,8 +10,10 @@ import {
   Circle, 
   ArrowUpDown,
   Calendar,
-  Briefcase
+  Briefcase,
+  History
 } from 'lucide-react';
+import { TaskHistoryModal } from './TaskHistoryModal';
 
 interface TasksViewProps {
   tasks: Task[];
@@ -26,6 +28,7 @@ export const TasksView: React.FC<TasksViewProps> = ({ tasks, resources, priority
   const [projectFilter, setProjectFilter] = useState<string>('All');
   const [sortField, setSortField] = useState<keyof Task>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [selectedTaskForHistory, setSelectedTaskForHistory] = useState<Task | null>(null);
 
   const projects = useMemo(() => {
     return Array.from(new Set(tasks.map(t => t.projectName))).sort();
@@ -141,6 +144,7 @@ export const TasksView: React.FC<TasksViewProps> = ({ tasks, resources, priority
                 </th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Priority</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -182,12 +186,21 @@ export const TasksView: React.FC<TasksViewProps> = ({ tasks, resources, priority
                     <td className="px-6 py-4">
                       <StatusBadge status={task.status} />
                     </td>
+                    <td className="px-6 py-4 text-right">
+                      <button 
+                        onClick={() => setSelectedTaskForHistory(task)}
+                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                        title="View Task History"
+                      >
+                        <History size={18} />
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
               {filteredTasks.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400 italic">
+                  <td colSpan={7} className="px-6 py-12 text-center text-slate-400 italic">
                     No tasks found matching your filters.
                   </td>
                 </tr>
@@ -196,6 +209,12 @@ export const TasksView: React.FC<TasksViewProps> = ({ tasks, resources, priority
           </table>
         </div>
       </div>
+
+      <TaskHistoryModal 
+        isOpen={!!selectedTaskForHistory}
+        onClose={() => setSelectedTaskForHistory(null)}
+        task={selectedTaskForHistory}
+      />
     </div>
   );
 };

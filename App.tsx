@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { format, isSameDay, parseISO } from 'date-fns';
+import { format, isSameDay, parseISO, addDays, isWithinInterval, differenceInDays } from 'date-fns';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Calendar as CalendarIcon, RefreshCw, Construction, Layers, CheckSquare, ArrowRight, LayoutList, Users } from 'lucide-react';
 
@@ -12,10 +12,12 @@ import { LeavesView } from './components/LeavesView';
 import { CapacityPlanningView } from './components/CapacityPlanningView';
 import { SettingsView } from './components/SettingsView';
 import { TasksView } from './components/TasksView';
+import { SkillsMatrixView } from './components/SkillsMatrixView';
 import { AIAssistantModal } from './components/AIAssistantModal';
 import { ResourceDetailsModal } from './components/ResourceDetailsModal';
+import { NotificationCenter } from './components/NotificationCenter';
 import { fetchSheetData } from './services/sheetService';
-import { AppState, FilterState, Resource, Task, TaskStatus, Leave, PriorityConfig } from './types';
+import { AppState, FilterState, Resource, Task, TaskStatus, Leave, PriorityConfig, Notification, TaskHistoryItem } from './types';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
@@ -24,6 +26,7 @@ const App: React.FC = () => {
     leaves: [],
     projects: [],
     priorityConfigs: [],
+    notifications: [],
     isLoading: true,
     error: null,
   });
@@ -57,6 +60,7 @@ const App: React.FC = () => {
           leaves,
           projects: ['All', ...uniqueProjects],
           priorityConfigs,
+          notifications: [],
           isLoading: false,
           error: null,
         });
@@ -163,10 +167,138 @@ const App: React.FC = () => {
     return filteredTasks.filter(t => t.assignedResourceId === resourceId);
   };
 
-  const handleUpdateTask = (updatedTask: Task) => {
+  // Notification Logic
+  useEffect(() => {
+    if (state.isLoading || state.tasks.length === 0) return;
+
+    const today = new Date();
+    const threeDaysFromNow = addDays(today, 3);
+    
+    const deadlineNotifications: Notification[] = state.tasks
+      .filter(t => t.status !== TaskStatus.COMPLETED)
+      .filter(t => {
+        const dueDate = parseISO(t.date);
+        return isWithinInterval(dueDate, { start: today, end: threeDaysFromNow });
+      })
+      .map(t => ({
+        id: `deadline-${t.id}`,
+        title: 'Upcoming Deadline',
+        message: `Task "${t.title}" is due on ${format(parseISO(t.date), 'MMM do')}.`,
+        type: 'deadline',
+        timestamp: new Date(),
+        read: false,
+        taskId: t.id
+      }));
+
+    if (deadlineNotifications.length > 0) {
+      setState(prev => {
+        // Only add if not already present
+        const existingIds = new Set(prev.notifications.map(n => n.id));
+        const newNotifications = deadlineNotifications.filter(n => !existingIds.has(n.id));
+        if (newNotifications.length === 0) return prev;
+        return {
+          ...prev,
+          notifications: [...newNotifications, ...prev.notifications]
+        };
+      });
+    }
+  }, [state.isLoading, state.tasks.length]);
+
+  const addNotification = (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
+    const newNotification: Notification = {
+      ...notification,
+      id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: new Date(),
+      read: false
+    };
     setState(prev => ({
       ...prev,
-      tasks: prev.tasks.map(t => t.id === updatedTask.id ? updatedTask : t)
+      notifications: [newNotification, ...prev.notifications]
+    }));
+  };
+
+  const handleMarkAsRead = (id: string) => {
+    setState(prev => ({
+      ...prev,
+      notifications: prev.notifications.map(n => n.id === id ? { ...n, read: true } : n)
+    }));
+  };
+
+  const handleMarkAllAsRead = () => {
+    setState(prev => ({
+      ...prev,
+      notifications: prev.notifications.map(n => ({ ...n, read: true }))
+    }));
+  };
+
+  const handleClearAll = () => {
+    setState(prev => ({
+      ...prev,
+      notifications: []
+    }));
+  };
+
+  const handleUpdateTask = (updatedTask: Task) => {
+    const originalTask = state.tasks.find(t => t.id === updatedTask.id);
+    const history: TaskHistoryItem[] = [...(originalTask?.history || [])];
+    
+    if (originalTask) {
+      // Check for status change
+      if (originalTask.status !== updatedTask.status) {
+        addNotification({
+          title: 'Status Updated',
+          message: `Task "${updatedTask.title}" changed from ${originalTask.status} to ${updatedTask.status}.`,
+          type: 'status',
+          taskId: updatedTask.id
+        });
+        history.push({
+          id: `hist-${Date.now()}-status`,
+          field: 'status',
+          oldValue: originalTask.status,
+          newValue: updatedTask.status,
+          timestamp: new Date(),
+          changedBy: 'Alex Manager'
+        });
+      }
+      
+      // Check for assignment change
+      if (originalTask.assignedResourceId !== updatedTask.assignedResourceId) {
+        const resource = state.resources.find(r => r.id === updatedTask.assignedResourceId);
+        const oldResource = state.resources.find(r => r.id === originalTask.assignedResourceId);
+        addNotification({
+          title: 'Task Reassigned',
+          message: `Task "${updatedTask.title}" has been reassigned to ${resource?.name || 'someone else'}.`,
+          type: 'assignment',
+          taskId: updatedTask.id
+        });
+        history.push({
+          id: `hist-${Date.now()}-assignee`,
+          field: 'assignee',
+          oldValue: oldResource?.name || 'Unassigned',
+          newValue: resource?.name || 'Unassigned',
+          timestamp: new Date(),
+          changedBy: 'Alex Manager'
+        });
+      }
+
+      // Check for priority change
+      if (originalTask.priority !== updatedTask.priority) {
+        history.push({
+          id: `hist-${Date.now()}-priority`,
+          field: 'priority',
+          oldValue: originalTask.priority,
+          newValue: updatedTask.priority,
+          timestamp: new Date(),
+          changedBy: 'Alex Manager'
+        });
+      }
+    }
+
+    const taskWithHistory = { ...updatedTask, history };
+
+    setState(prev => ({
+      ...prev,
+      tasks: prev.tasks.map(t => t.id === updatedTask.id ? taskWithHistory : t)
     }));
   };
 
@@ -212,9 +344,15 @@ const App: React.FC = () => {
       onAIRequest={() => setAIModalOpen(true)}
       currentView={currentView}
       onNavigate={setCurrentView}
+      notifications={state.notifications}
+      onMarkAsRead={handleMarkAsRead}
+      onMarkAllAsRead={handleMarkAllAsRead}
+      onClearAll={handleClearAll}
     >
       {currentView === 'team' ? (
-        <TeamView resources={state.resources} />
+        <TeamView resources={state.resources} onNavigate={setCurrentView} />
+      ) : currentView === 'skills-matrix' ? (
+        <SkillsMatrixView resources={state.resources} />
       ) : currentView === 'capacity' ? (
         <CapacityPlanningView 
           resources={state.resources} 

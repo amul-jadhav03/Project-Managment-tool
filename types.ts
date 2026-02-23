@@ -23,6 +23,15 @@ export interface Resource {
   skills: string[];
 }
 
+export interface TaskHistoryItem {
+  id: string;
+  field: 'status' | 'assignee' | 'priority' | 'general';
+  oldValue: string;
+  newValue: string;
+  timestamp: Date;
+  changedBy: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -34,6 +43,7 @@ export interface Task {
   status: TaskStatus;
   priority: string;
   requiredSkills?: string[];
+  history?: TaskHistoryItem[];
 }
 
 export interface Leave {
@@ -45,12 +55,23 @@ export interface Leave {
   status: 'Approved' | 'Pending';
 }
 
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'deadline' | 'assignment' | 'status' | 'info';
+  timestamp: Date;
+  read: boolean;
+  taskId?: string;
+}
+
 export interface AppState {
   resources: Resource[];
   tasks: Task[];
   leaves: Leave[];
   projects: string[];
   priorityConfigs: PriorityConfig[];
+  notifications: Notification[];
   isLoading: boolean;
   error: string | null;
 }

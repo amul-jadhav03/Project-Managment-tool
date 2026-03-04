@@ -4,10 +4,12 @@ import { Search, Filter, Users, Tag, ChevronRight, Info } from 'lucide-react';
 
 interface SkillsMatrixViewProps {
   resources: Resource[];
+  globalSearch?: string;
 }
 
-export const SkillsMatrixView: React.FC<SkillsMatrixViewProps> = ({ resources }) => {
-  const [searchTerm, setSearchTerm] = useState('');
+export const SkillsMatrixView: React.FC<SkillsMatrixViewProps> = ({ resources, globalSearch = '' }) => {
+  const [localSearchTerm, setLocalSearchTerm] = useState('');
+  const searchTerm = localSearchTerm || globalSearch;
   const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
 
   // Extract all unique skills across all resources
@@ -105,7 +107,7 @@ export const SkillsMatrixView: React.FC<SkillsMatrixViewProps> = ({ resources })
             type="text" 
             placeholder="Search team members by name or role..." 
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => setLocalSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-sm shadow-sm"
           />
         </div>
@@ -178,7 +180,7 @@ export const SkillsMatrixView: React.FC<SkillsMatrixViewProps> = ({ resources })
             <h3 className="text-lg font-bold text-slate-900">No team members found</h3>
             <p className="text-slate-500">Try adjusting your search or skill filters.</p>
             <button 
-              onClick={() => { setSearchTerm(''); setSelectedSkill(null); }}
+              onClick={() => { setLocalSearchTerm(''); setSelectedSkill(null); }}
               className="mt-4 text-indigo-600 font-bold hover:underline"
             >
               Clear all filters

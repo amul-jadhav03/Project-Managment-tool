@@ -9,6 +9,7 @@ export interface PriorityConfig {
   label: string;
   color: string;
   textColor: string;
+  order: number;
 }
 
 export interface Resource {

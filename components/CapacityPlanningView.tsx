@@ -29,6 +29,7 @@ interface CapacityPlanningViewProps {
   projects: string[];
   onUpdateResource: (resource: Resource) => void;
   priorityConfigs: PriorityConfig[];
+  globalSearch?: string;
 }
 
 export const CapacityPlanningView: React.FC<CapacityPlanningViewProps> = ({ 
@@ -36,7 +37,8 @@ export const CapacityPlanningView: React.FC<CapacityPlanningViewProps> = ({
   tasks, 
   projects,
   onUpdateResource,
-  priorityConfigs
+  priorityConfigs,
+  globalSearch = ''
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [editingResourceId, setEditingResourceId] = useState<string | null>(null);
@@ -49,9 +51,11 @@ export const CapacityPlanningView: React.FC<CapacityPlanningViewProps> = ({
     project: 'All',
     status: 'All',
     priority: 'All',
-    search: '',
+    localSearch: '',
     skill: 'All'
   });
+
+  const searchTerm = filters.localSearch || globalSearch;
 
   const allSkills = useMemo(() => {
     const skills = new Set<string>();
@@ -72,12 +76,12 @@ export const CapacityPlanningView: React.FC<CapacityPlanningViewProps> = ({
 
   const filteredResources = useMemo(() => {
     return resources.filter(resource => {
-      const searchMatch = resource.name.toLowerCase().includes(filters.search.toLowerCase()) || 
-                         resource.role.toLowerCase().includes(filters.search.toLowerCase());
+      const searchMatch = resource.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         resource.role.toLowerCase().includes(searchTerm.toLowerCase());
       const skillMatch = filters.skill === 'All' || resource.skills?.includes(filters.skill);
       return searchMatch && skillMatch;
     });
-  }, [resources, filters.search, filters.skill]);
+  }, [resources, searchTerm, filters.skill]);
 
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 }); // Monday
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
@@ -225,8 +229,8 @@ export const CapacityPlanningView: React.FC<CapacityPlanningViewProps> = ({
           <input 
             type="text" 
             placeholder="Search resources..." 
-            value={filters.search}
-            onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+            value={searchTerm}
+            onChange={(e) => setFilters(prev => ({ ...prev, localSearch: e.target.value }))}
             className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all"
           />
         </div>
@@ -275,9 +279,9 @@ export const CapacityPlanningView: React.FC<CapacityPlanningViewProps> = ({
             ))}
           </select>
 
-          {(filters.project !== 'All' || filters.status !== 'All' || filters.priority !== 'All' || filters.search !== '' || filters.skill !== 'All') && (
+          {(filters.project !== 'All' || filters.status !== 'All' || filters.priority !== 'All' || filters.localSearch !== '' || filters.skill !== 'All') && (
             <button 
-              onClick={() => setFilters({ project: 'All', status: 'All', priority: 'All', search: '', skill: 'All' })}
+              onClick={() => setFilters({ project: 'All', status: 'All', priority: 'All', localSearch: '', skill: 'All' })}
               className="text-xs font-bold text-indigo-600 hover:text-indigo-700 uppercase tracking-wider"
             >
               Clear

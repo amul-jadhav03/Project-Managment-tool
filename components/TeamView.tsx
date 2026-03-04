@@ -5,15 +5,37 @@ import { Mail, Briefcase, Users, ArrowUpDown, Tag } from 'lucide-react';
 interface TeamViewProps {
   resources: Resource[];
   onNavigate?: (view: string) => void;
+  onUpdateResource?: (resource: Resource) => void;
+  globalSearch?: string;
 }
 
 type SortOption = 'name' | 'role' | 'department';
 
-export const TeamView: React.FC<TeamViewProps> = ({ resources, onNavigate }) => {
+export const TeamView: React.FC<TeamViewProps> = ({ resources, onNavigate, onUpdateResource, globalSearch = '' }) => {
   const [sortBy, setSortBy] = useState<SortOption>('name');
 
+  const handleToggleBilling = (resource: Resource) => {
+    if (onUpdateResource) {
+      onUpdateResource({
+        ...resource,
+        isBillable: !resource.isBillable
+      });
+    }
+  };
+
+  const filteredResources = useMemo(() => {
+    return resources.filter(r => {
+      if (!globalSearch) return true;
+      const search = globalSearch.toLowerCase();
+      return r.name.toLowerCase().includes(search) || 
+             r.role.toLowerCase().includes(search) || 
+             r.department.toLowerCase().includes(search) ||
+             r.skills?.some(s => s.toLowerCase().includes(search));
+    });
+  }, [resources, globalSearch]);
+
   const sortedResources = useMemo(() => {
-    return [...resources].sort((a, b) => {
+    return [...filteredResources].sort((a, b) => {
       const valA = (a[sortBy] || '').toString().toLowerCase();
       const valB = (b[sortBy] || '').toString().toLowerCase();
       return valA.localeCompare(valB);
@@ -101,6 +123,20 @@ export const TeamView: React.FC<TeamViewProps> = ({ resources, onNavigate }) => 
                 <div className="mt-4 pt-3 border-t border-slate-50 flex justify-between items-center text-xs">
                     <span className="text-slate-400">Daily Capacity</span>
                     <span className="font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">{resource.capacity} hours</span>
+                </div>
+
+                <div className="mt-2 pt-2 border-t border-slate-50 flex justify-between items-center text-xs">
+                    <span className="text-slate-400">Billing Status</span>
+                    <button 
+                      onClick={() => handleToggleBilling(resource)}
+                      className={`px-2 py-1 rounded-full font-bold transition-all ${
+                        resource.isBillable 
+                          ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
+                          : 'bg-slate-100 text-slate-500 border border-slate-200'
+                      }`}
+                    >
+                      {resource.isBillable ? 'Billable' : 'Non-Billable'}
+                    </button>
                 </div>
               </div>
             </div>

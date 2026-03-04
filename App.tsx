@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { format, isSameDay, parseISO, addDays, isWithinInterval, differenceInDays } from 'date-fns';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Calendar as CalendarIcon, RefreshCw, Construction, Layers, CheckSquare, ArrowRight, LayoutList, Users } from 'lucide-react';
+import { Calendar as CalendarIcon, RefreshCw, Construction, Layers, CheckSquare, ArrowRight, LayoutList, Users, LayoutGrid, List } from 'lucide-react';
 
 import { Layout } from './components/Layout';
 import { ResourceCard } from './components/ResourceCard';
@@ -43,6 +43,8 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState('dashboard');
   const [isAIModalOpen, setAIModalOpen] = useState(false);
   const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
+  const [projectsViewMode, setProjectsViewMode] = useState<'tile' | 'list'>('tile');
+  const [resourceViewMode, setResourceViewMode] = useState<'tile' | 'list'>('tile');
 
   // Load Data
   useEffect(() => {
@@ -102,8 +104,10 @@ const App: React.FC = () => {
         hours,
         status: progress === 100 ? 'Completed' : progress > 50 ? 'On Track' : 'In Progress'
       };
-    }).sort((a, b) => b.progress - a.progress);
-  }, [state.tasks, state.projects]);
+    })
+    .filter(p => !filters.search || p.name.toLowerCase().includes(filters.search.toLowerCase()))
+    .sort((a, b) => b.progress - a.progress);
+  }, [state.tasks, state.projects, filters.search]);
 
   // Filter Logic for Resource View
   const filteredResources = useMemo(() => {
@@ -111,9 +115,13 @@ const App: React.FC = () => {
       const roleMatch = filters.role === 'All' || resource.role === filters.role;
       const deptMatch = filters.department === 'All' || resource.department === filters.department;
       const skillMatch = filters.skill === 'All' || resource.skills?.includes(filters.skill);
-      return roleMatch && deptMatch && skillMatch;
+      const searchMatch = !filters.search || 
+        resource.name.toLowerCase().includes(filters.search.toLowerCase()) ||
+        resource.role.toLowerCase().includes(filters.search.toLowerCase()) ||
+        resource.department.toLowerCase().includes(filters.search.toLowerCase());
+      return roleMatch && deptMatch && skillMatch && searchMatch;
     });
-  }, [state.resources, filters.role, filters.department, filters.skill]);
+  }, [state.resources, filters.role, filters.department, filters.skill, filters.search]);
 
   const filteredTasks = useMemo(() => {
     return state.tasks.filter(task => {
@@ -128,7 +136,12 @@ const App: React.FC = () => {
       const isDeptMatch = filters.department === 'All' || resource.department === filters.department;
       const isResourceSkillMatch = filters.skill === 'All' || resource.skills?.includes(filters.skill);
 
-      return isDateMatch && isProjectMatch && isRoleMatch && isDeptMatch && isSkillMatch && isResourceSkillMatch;
+      const searchMatch = !filters.search || 
+        task.title.toLowerCase().includes(filters.search.toLowerCase()) ||
+        task.projectName.toLowerCase().includes(filters.search.toLowerCase()) ||
+        resource.name.toLowerCase().includes(filters.search.toLowerCase());
+
+      return isDateMatch && isProjectMatch && isRoleMatch && isDeptMatch && isSkillMatch && isResourceSkillMatch && searchMatch;
     });
   }, [state.tasks, state.resources, filters]);
 
@@ -348,11 +361,18 @@ const App: React.FC = () => {
       onMarkAsRead={handleMarkAsRead}
       onMarkAllAsRead={handleMarkAllAsRead}
       onClearAll={handleClearAll}
+      searchValue={filters.search}
+      onSearchChange={(val) => setFilters(prev => ({ ...prev, search: val }))}
     >
       {currentView === 'team' ? (
-        <TeamView resources={state.resources} onNavigate={setCurrentView} />
+        <TeamView 
+          resources={state.resources} 
+          onNavigate={setCurrentView} 
+          onUpdateResource={handleUpdateResource}
+          globalSearch={filters.search} 
+        />
       ) : currentView === 'skills-matrix' ? (
-        <SkillsMatrixView resources={state.resources} />
+        <SkillsMatrixView resources={state.resources} globalSearch={filters.search} />
       ) : currentView === 'capacity' ? (
         <CapacityPlanningView 
           resources={state.resources} 
@@ -360,11 +380,18 @@ const App: React.FC = () => {
           projects={state.projects}
           onUpdateResource={handleUpdateResource} 
           priorityConfigs={state.priorityConfigs}
+          globalSearch={filters.search}
         />
       ) : currentView === 'projects' ? (
-        <ProjectsView tasks={state.tasks} resources={state.resources} />
+        <ProjectsView tasks={state.tasks} resources={state.resources} globalSearch={filters.search} />
       ) : currentView === 'tasks' ? (
-        <TasksView tasks={state.tasks} resources={state.resources} priorityConfigs={state.priorityConfigs} />
+        <TasksView 
+          tasks={state.tasks} 
+          resources={state.resources} 
+          priorityConfigs={state.priorityConfigs} 
+          globalSearch={filters.search}
+          onUpdateTask={handleUpdateTask}
+        />
       ) : currentView === 'reports' ? (
         <ReportsView tasks={state.tasks} resources={state.resources} />
       ) : currentView === 'leaves' ? (
@@ -408,45 +435,115 @@ const App: React.FC = () => {
                   <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                     <LayoutList size={20} className="text-slate-400" /> Active Projects
                   </h2>
-                  <button 
-                    onClick={() => setCurrentView('projects')}
-                    className="text-sm text-indigo-600 font-medium hover:underline flex items-center gap-1"
-                  >
-                    View All <ArrowRight size={14} />
-                  </button>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center bg-slate-100 p-1 rounded-lg">
+                      <button 
+                        onClick={() => setProjectsViewMode('tile')}
+                        className={`p-1.5 rounded-md transition-all ${projectsViewMode === 'tile' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        title="Grid View"
+                      >
+                        <LayoutGrid size={16} />
+                      </button>
+                      <button 
+                        onClick={() => setProjectsViewMode('list')}
+                        className={`p-1.5 rounded-md transition-all ${projectsViewMode === 'list' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        title="List View"
+                      >
+                        <List size={16} />
+                      </button>
+                    </div>
+                    <button 
+                      onClick={() => setCurrentView('projects')}
+                      className="text-sm text-indigo-600 font-medium hover:underline flex items-center gap-1"
+                    >
+                      View All <ArrowRight size={14} />
+                    </button>
+                  </div>
                </div>
 
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {projectMetrics.slice(0, 4).map(proj => (
-                    <div 
-                        key={proj.name} 
-                        onClick={() => setCurrentView('projects')}
-                        className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow group cursor-pointer"
-                    >
-                       <div className="flex justify-between items-start mb-3">
-                          <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg">
-                            {proj.name.charAt(0)}
-                          </div>
-                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                            proj.progress === 100 ? 'bg-emerald-100 text-emerald-700' : 
-                            proj.progress > 50 ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600'
-                          }`}>
-                            {proj.status}
-                          </span>
-                       </div>
-                       <h3 className="font-bold text-slate-900 mb-1 group-hover:text-indigo-600 transition-colors">{proj.name}</h3>
-                       <p className="text-xs text-slate-500 mb-4">{proj.total} tasks • {proj.hours} hours estimated</p>
-                       
-                       <div className="w-full bg-slate-100 rounded-full h-2 mb-2">
-                          <div className="bg-indigo-500 h-2 rounded-full transition-all duration-500" style={{ width: `${proj.progress}%` }}></div>
-                       </div>
-                       <div className="flex justify-between text-xs text-slate-400 font-medium">
-                          <span>{proj.progress}% Complete</span>
-                          <span>{proj.completed}/{proj.total} Done</span>
-                       </div>
-                    </div>
-                  ))}
-               </div>
+               {projectsViewMode === 'tile' ? (
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {projectMetrics.slice(0, 4).map(proj => (
+                      <div 
+                          key={proj.name} 
+                          onClick={() => setCurrentView('projects')}
+                          className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-shadow group cursor-pointer"
+                      >
+                         <div className="flex justify-between items-start mb-3">
+                            <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg">
+                              {proj.name.charAt(0)}
+                            </div>
+                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                              proj.progress === 100 ? 'bg-emerald-100 text-emerald-700' : 
+                              proj.progress > 50 ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600'
+                            }`}>
+                              {proj.status}
+                            </span>
+                         </div>
+                         <h3 className="font-bold text-slate-900 mb-1 group-hover:text-indigo-600 transition-colors">{proj.name}</h3>
+                         <p className="text-xs text-slate-500 mb-4">{proj.total} tasks • {proj.hours} hours estimated</p>
+                         
+                         <div className="w-full bg-slate-100 rounded-full h-2 mb-2">
+                            <div className="bg-indigo-500 h-2 rounded-full transition-all duration-500" style={{ width: `${proj.progress}%` }}></div>
+                         </div>
+                         <div className="flex justify-between text-xs text-slate-400 font-medium">
+                            <span>{proj.progress}% Complete</span>
+                            <span>{proj.completed}/{proj.total} Done</span>
+                         </div>
+                      </div>
+                    ))}
+                 </div>
+               ) : (
+                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                   <table className="w-full text-left">
+                     <thead className="bg-slate-50 border-b border-slate-200">
+                       <tr>
+                         <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Project</th>
+                         <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Status</th>
+                         <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Progress</th>
+                         <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Tasks</th>
+                       </tr>
+                     </thead>
+                     <tbody className="divide-y divide-slate-100">
+                       {projectMetrics.slice(0, 6).map(proj => (
+                         <tr 
+                           key={proj.name} 
+                           onClick={() => setCurrentView('projects')}
+                           className="hover:bg-slate-50 cursor-pointer transition-colors"
+                         >
+                           <td className="px-6 py-4">
+                             <div className="flex items-center gap-3">
+                               <div className="w-8 h-8 rounded bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm">
+                                 {proj.name.charAt(0)}
+                               </div>
+                               <span className="font-bold text-slate-900">{proj.name}</span>
+                             </div>
+                           </td>
+                           <td className="px-6 py-4">
+                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                               proj.progress === 100 ? 'bg-emerald-100 text-emerald-700' : 
+                               proj.progress > 50 ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600'
+                             }`}>
+                               {proj.status}
+                             </span>
+                           </td>
+                           <td className="px-6 py-4">
+                             <div className="flex items-center gap-3">
+                               <div className="w-24 bg-slate-100 rounded-full h-1.5">
+                                 <div className="bg-indigo-500 h-1.5 rounded-full" style={{ width: `${proj.progress}%` }}></div>
+                               </div>
+                               <span className="text-xs font-medium text-slate-600">{proj.progress}%</span>
+                             </div>
+                           </td>
+                           <td className="px-6 py-4 text-xs text-slate-500">
+                             {proj.completed}/{proj.total} Done
+                           </td>
+                         </tr>
+                       ))}
+                     </tbody>
+                   </table>
+                 </div>
+               )}
             </div>
 
             {/* Side Column: Charts & Quick Stats */}
@@ -505,6 +602,22 @@ const App: React.FC = () => {
                
                {/* Filters Bar */}
                <div className="flex flex-wrap items-center gap-3 bg-white p-1.5 rounded-lg border border-slate-200 shadow-sm">
+                   <div className="flex items-center bg-slate-100 p-1 rounded-lg mr-2">
+                      <button 
+                        onClick={() => setResourceViewMode('tile')}
+                        className={`p-1.5 rounded-md transition-all ${resourceViewMode === 'tile' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        title="Grid View"
+                      >
+                        <LayoutGrid size={14} />
+                      </button>
+                      <button 
+                        onClick={() => setResourceViewMode('list')}
+                        className={`p-1.5 rounded-md transition-all ${resourceViewMode === 'list' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        title="List View"
+                      >
+                        <List size={14} />
+                      </button>
+                   </div>
                    <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded border border-slate-200">
                        <CalendarIcon size={14} className="text-slate-500" />
                        <input 
@@ -543,7 +656,7 @@ const App: React.FC = () => {
                 <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
                   <p className="text-slate-500">No tasks scheduled for {format(filters.date, 'MMM do')}.</p>
                 </div>
-              ) : (
+              ) : resourceViewMode === 'tile' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {filteredResources.map(resource => {
                     const tasksForResource = getTasksForResource(resource.id);
@@ -560,6 +673,85 @@ const App: React.FC = () => {
                       />
                     );
                   })}
+                </div>
+              ) : (
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-50 border-b border-slate-200">
+                      <tr>
+                        <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Resource</th>
+                        <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Status</th>
+                        <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Tasks</th>
+                        <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Load</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredResources.map(resource => {
+                        const tasksForResource = getTasksForResource(resource.id);
+                        const onLeave = isResourceOnLeave(resource.id, filters.date);
+                        if (filters.project !== 'All' && tasksForResource.length === 0 && !onLeave) return null;
+                        
+                        const totalHours = tasksForResource.reduce((acc, t) => acc + t.duration, 0);
+                        const loadPercentage = Math.min(Math.round((totalHours / resource.capacity) * 100), 100);
+                        
+                        return (
+                          <tr 
+                            key={resource.id} 
+                            onClick={() => setSelectedResource(resource)}
+                            className="hover:bg-slate-50 cursor-pointer transition-colors"
+                          >
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <img 
+                                  src={resource.avatarUrl} 
+                                  alt={resource.name} 
+                                  className="w-8 h-8 rounded-full border border-slate-200"
+                                  referrerPolicy="no-referrer"
+                                />
+                                <div>
+                                  <div className="font-bold text-slate-900 text-sm">{resource.name}</div>
+                                  <div className="text-[10px] text-slate-500">{resource.role}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              {onLeave ? (
+                                <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-bold uppercase">On Leave</span>
+                              ) : tasksForResource.length > 0 ? (
+                                <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold uppercase">Assigned</span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold uppercase">Available</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex flex-wrap gap-1">
+                                {tasksForResource.length > 0 ? (
+                                  tasksForResource.map(t => (
+                                    <span key={t.id} className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] border border-slate-200">
+                                      {t.projectName}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-slate-400 text-[10px] italic">No tasks</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-2">
+                                <div className="w-16 bg-slate-100 rounded-full h-1.5">
+                                  <div 
+                                    className={`h-1.5 rounded-full ${loadPercentage > 100 ? 'bg-rose-500' : loadPercentage > 80 ? 'bg-amber-500' : 'bg-emerald-500'}`} 
+                                    style={{ width: `${loadPercentage}%` }}
+                                  ></div>
+                                </div>
+                                <span className="text-[10px] font-bold text-slate-600">{totalHours}h</span>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
           </div>

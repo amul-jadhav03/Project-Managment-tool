@@ -27,10 +27,10 @@ export const fetchSheetData = async (): Promise<{ resources: Resource[], tasks: 
 };
 
 export const getDefaultPriorityConfigs = (): PriorityConfig[] => [
-  { label: 'Urgent', color: '#ef4444', textColor: '#ffffff' },
-  { label: 'High', color: '#f97316', textColor: '#ffffff' },
-  { label: 'Medium', color: '#eab308', textColor: '#ffffff' },
-  { label: 'Low', color: '#3b82f6', textColor: '#ffffff' },
+  { label: 'Urgent', color: '#ef4444', textColor: '#ffffff', order: 0 },
+  { label: 'High', color: '#f97316', textColor: '#ffffff', order: 1 },
+  { label: 'Medium', color: '#eab308', textColor: '#ffffff', order: 2 },
+  { label: 'Low', color: '#3b82f6', textColor: '#ffffff', order: 3 },
 ];
 
 const parseCSVData = (csvText: string): { resources: Resource[], tasks: Task[] } => {
@@ -62,7 +62,8 @@ const parseCSVData = (csvText: string): { resources: Resource[], tasks: Task[] }
         capacity: 8,
         weeklyCapacity: 40,
         skills: (row['skills'] || '').split(',').map((s: string) => s.trim()).filter(Boolean),
-        avatarUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(resourceName)}&background=random`
+        avatarUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(resourceName)}&background=random`,
+        isBillable: true
       });
     }
 
@@ -112,10 +113,10 @@ const getMockLeaves = (): Leave[] => {
 // Fallback data if the sheet is inaccessible
 const getMockData = () => {
   const resources: Resource[] = [
-    { id: 'alex-chen', name: 'Alex Chen', role: 'Senior Dev', department: 'Frontend', capacity: 8, weeklyCapacity: 40, skills: ['React', 'TypeScript', 'Tailwind'], avatarUrl: 'https://i.pravatar.cc/150?u=alex' },
-    { id: 'sarah-jones', name: 'Sarah Jones', role: 'Product Manager', department: 'Product', capacity: 8, weeklyCapacity: 40, skills: ['Roadmapping', 'Agile', 'Communication'], avatarUrl: 'https://i.pravatar.cc/150?u=sarah' },
-    { id: 'mike-ross', name: 'Mike Ross', role: 'UX Designer', department: 'Design', capacity: 6, weeklyCapacity: 30, skills: ['Figma', 'User Research', 'Prototyping'], avatarUrl: 'https://i.pravatar.cc/150?u=mike' },
-    { id: 'emily-wong', name: 'Emily Wong', role: 'Backend Dev', department: 'Backend', capacity: 8, weeklyCapacity: 40, skills: ['Node.js', 'PostgreSQL', 'Docker'], avatarUrl: 'https://i.pravatar.cc/150?u=emily' },
+    { id: 'alex-chen', name: 'Alex Chen', role: 'Senior Dev', department: 'Frontend', capacity: 8, weeklyCapacity: 40, skills: ['React', 'TypeScript', 'Tailwind'], avatarUrl: 'https://i.pravatar.cc/150?u=alex', isBillable: true },
+    { id: 'sarah-jones', name: 'Sarah Jones', role: 'Product Manager', department: 'Product', capacity: 8, weeklyCapacity: 40, skills: ['Roadmapping', 'Agile', 'Communication'], avatarUrl: 'https://i.pravatar.cc/150?u=sarah', isBillable: true },
+    { id: 'mike-ross', name: 'Mike Ross', role: 'UX Designer', department: 'Design', capacity: 6, weeklyCapacity: 30, skills: ['Figma', 'User Research', 'Prototyping'], avatarUrl: 'https://i.pravatar.cc/150?u=mike', isBillable: false },
+    { id: 'emily-wong', name: 'Emily Wong', role: 'Backend Dev', department: 'Backend', capacity: 8, weeklyCapacity: 40, skills: ['Node.js', 'PostgreSQL', 'Docker'], avatarUrl: 'https://i.pravatar.cc/150?u=emily', isBillable: true },
   ];
 
   const today = new Date().toISOString().split('T')[0];

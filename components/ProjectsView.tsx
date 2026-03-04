@@ -8,17 +8,24 @@ interface ProjectsViewProps {
   tasks: Task[];
   resources: Resource[];
   onProjectSelect?: (projectName: string) => void;
+  globalSearch?: string;
 }
 
-export const ProjectsView: React.FC<ProjectsViewProps> = ({ tasks, resources, onProjectSelect }) => {
+export const ProjectsView: React.FC<ProjectsViewProps> = ({ tasks, resources, onProjectSelect, globalSearch = '' }) => {
   const [selectedProject, setSelectedProject] = useState<any | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   const projects = useMemo(() => {
     const uniqueProjects = Array.from(new Set(tasks.map(t => t.projectName))).sort();
     
-    return uniqueProjects.filter(p => p !== 'General' && p !== 'All').map(name => {
-      const projectTasks = tasks.filter(t => t.projectName === name);
+    return uniqueProjects
+      .filter(p => p !== 'General' && p !== 'All')
+      .filter(p => {
+        if (!globalSearch) return true;
+        return p.toLowerCase().includes(globalSearch.toLowerCase());
+      })
+      .map(name => {
+        const projectTasks = tasks.filter(t => t.projectName === name);
       
       const totalTasks = projectTasks.length;
       const completedTasks = projectTasks.filter(t => t.status === TaskStatus.COMPLETED).length;

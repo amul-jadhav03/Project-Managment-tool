@@ -12,6 +12,8 @@ interface LayoutProps {
   onMarkAsRead: (id: string) => void;
   onMarkAllAsRead: () => void;
   onClearAll: () => void;
+  searchValue: string;
+  onSearchChange: (value: string) => void;
 }
 
 export const Layout: React.FC<LayoutProps> = ({ 
@@ -22,7 +24,9 @@ export const Layout: React.FC<LayoutProps> = ({
   notifications,
   onMarkAsRead,
   onMarkAllAsRead,
-  onClearAll
+  onClearAll,
+  searchValue,
+  onSearchChange
 }) => {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -141,6 +145,8 @@ export const Layout: React.FC<LayoutProps> = ({
               <input 
                 type="text" 
                 placeholder="Search projects, tasks, or people..." 
+                value={searchValue}
+                onChange={(e) => onSearchChange(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 rounded-lg bg-slate-100 border-none focus:ring-2 focus:ring-indigo-500 text-sm transition-all focus:bg-white focus:shadow-sm"
               />
             </div>

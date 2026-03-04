@@ -20,7 +20,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ priorityConfigs, onU
   };
 
   const handleAddPriority = () => {
-    setLocalConfigs([...localConfigs, { label: 'New Priority', color: '#94a3b8', textColor: '#ffffff' }]);
+    const maxOrder = localConfigs.length > 0 ? Math.max(...localConfigs.map(c => c.order)) : -1;
+    setLocalConfigs([...localConfigs, { 
+      label: 'New Priority', 
+      color: '#94a3b8', 
+      textColor: '#ffffff',
+      order: maxOrder + 1
+    }]);
     setHasChanges(true);
   };
 

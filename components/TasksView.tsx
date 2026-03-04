@@ -19,16 +19,29 @@ interface TasksViewProps {
   tasks: Task[];
   resources: Resource[];
   priorityConfigs: PriorityConfig[];
+  globalSearch?: string;
+  onUpdateTask?: (task: Task) => void;
 }
 
-export const TasksView: React.FC<TasksViewProps> = ({ tasks, resources, priorityConfigs }) => {
-  const [searchTerm, setSearchTerm] = useState('');
+export const TasksView: React.FC<TasksViewProps> = ({ tasks, resources, priorityConfigs, globalSearch = '', onUpdateTask }) => {
+  const [localSearchTerm, setLocalSearchTerm] = useState('');
+  const searchTerm = localSearchTerm || globalSearch;
+  
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [priorityFilter, setPriorityFilter] = useState<string>('All');
   const [projectFilter, setProjectFilter] = useState<string>('All');
   const [sortField, setSortField] = useState<keyof Task>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedTaskForHistory, setSelectedTaskForHistory] = useState<Task | null>(null);
+
+  const handlePriorityChange = (task: Task, newPriority: string) => {
+    if (onUpdateTask) {
+      onUpdateTask({
+        ...task,
+        priority: newPriority
+      });
+    }
+  };
 
   const projects = useMemo(() => {
     return Array.from(new Set(tasks.map(t => t.projectName))).sort();
@@ -44,6 +57,12 @@ export const TasksView: React.FC<TasksViewProps> = ({ tasks, resources, priority
       
       return matchesSearch && matchesStatus && matchesPriority && matchesProject;
     }).sort((a, b) => {
+      if (sortField === 'priority') {
+        const orderA = priorityConfigs.find(p => p.label === a.priority)?.order ?? 99;
+        const orderB = priorityConfigs.find(p => p.label === b.priority)?.order ?? 99;
+        return sortOrder === 'asc' ? orderA - orderB : orderB - orderA;
+      }
+
       const valA = a[sortField];
       const valB = b[sortField];
       
@@ -91,7 +110,7 @@ export const TasksView: React.FC<TasksViewProps> = ({ tasks, resources, priority
               type="text" 
               placeholder="Search tasks by title or description..." 
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => setLocalSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 rounded-lg bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-sm"
             />
           </div>
@@ -142,8 +161,12 @@ export const TasksView: React.FC<TasksViewProps> = ({ tasks, resources, priority
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('date')}>
                   <div className="flex items-center gap-2">Due Date <ArrowUpDown size={12}/></div>
                 </th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Priority</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('priority')}>
+                  <div className="flex items-center gap-2">Priority <ArrowUpDown size={12}/></div>
+                </th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('status')}>
+                  <div className="flex items-center gap-2">Status <ArrowUpDown size={12}/></div>
+                </th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
               </tr>
             </thead>
@@ -176,12 +199,21 @@ export const TasksView: React.FC<TasksViewProps> = ({ tasks, resources, priority
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span 
-                        className="inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm border border-black/5"
-                        style={{ backgroundColor: priorityConfig?.color || '#f1f5f9', color: priorityConfig?.textColor || '#475569' }}
+                      <select
+                        value={task.priority}
+                        onChange={(e) => handlePriorityChange(task, e.target.value)}
+                        className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm border border-black/5 outline-none cursor-pointer transition-all hover:scale-105"
+                        style={{ 
+                          backgroundColor: priorityConfig?.color || '#f1f5f9', 
+                          color: priorityConfig?.textColor || '#475569' 
+                        }}
                       >
-                        {task.priority}
-                      </span>
+                        {priorityConfigs.map(p => (
+                          <option key={p.label} value={p.label} style={{ backgroundColor: '#fff', color: '#000' }}>
+                            {p.label}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                     <td className="px-6 py-4">
                       <StatusBadge status={task.status} />

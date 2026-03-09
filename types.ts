@@ -1,3 +1,19 @@
+export enum UserRole {
+  SUPER_ADMIN = 'super_admin',
+  ADMIN = 'admin',
+  MANAGER = 'manager',
+  RESOURCE = 'resource'
+}
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName?: string;
+  role: UserRole;
+  assignedProjects?: string[]; // For Admin, Manager, Resource
+  createdAt: string;
+}
+
 export enum TaskStatus {
   TODO = 'To Do',
   IN_PROGRESS = 'In Progress',
@@ -47,6 +63,7 @@ export interface Task {
   priority: string;
   requiredSkills?: string[];
   history?: TaskHistoryItem[];
+  reminderDays?: number; // Days before deadline to trigger reminder
 }
 
 export interface Leave {
@@ -75,8 +92,11 @@ export interface AppState {
   projects: string[];
   priorityConfigs: PriorityConfig[];
   notifications: Notification[];
+  user: UserProfile | null;
+  authLoading: boolean;
   isLoading: boolean;
   error: string | null;
+  emailRemindersEnabled: boolean;
 }
 
 export interface FilterState {

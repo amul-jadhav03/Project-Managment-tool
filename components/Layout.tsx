@@ -1,7 +1,8 @@
 import React, { ReactNode, useState } from 'react';
 import { LayoutDashboard, FolderKanban, Users, Settings, Bell, Search, Sparkles, CheckSquare, PieChart, Coffee, Clock, Tag } from 'lucide-react';
-import { Notification } from '../types';
+import { Notification, UserProfile, UserRole } from '../types';
 import { NotificationCenter } from './NotificationCenter';
+import { LogOut, ShieldCheck, User as UserIcon, Briefcase, Settings as SettingsIcon } from 'lucide-react';
 
 interface LayoutProps {
   children: ReactNode;
@@ -14,6 +15,8 @@ interface LayoutProps {
   onClearAll: () => void;
   searchValue: string;
   onSearchChange: (value: string) => void;
+  user: UserProfile | null;
+  onLogout: () => void;
 }
 
 export const Layout: React.FC<LayoutProps> = ({ 
@@ -26,10 +29,28 @@ export const Layout: React.FC<LayoutProps> = ({
   onMarkAllAsRead,
   onClearAll,
   searchValue,
-  onSearchChange
+  onSearchChange,
+  user,
+  onLogout
 }) => {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const unreadCount = notifications.filter(n => !n.read).length;
+
+  const canSeeDashboard = true;
+  const canSeeTeam = true;
+  const canSeeProjects = true;
+  const canSeeTasks = true;
+  const canSeeSettings = user?.role !== UserRole.RESOURCE;
+
+  const getRoleBadge = (role?: UserRole) => {
+    switch (role) {
+      case UserRole.SUPER_ADMIN: return <span className="text-[10px] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded uppercase tracking-tighter">Super Admin</span>;
+      case UserRole.ADMIN: return <span className="text-[10px] font-bold bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded uppercase tracking-tighter">Admin</span>;
+      case UserRole.MANAGER: return <span className="text-[10px] font-bold bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded uppercase tracking-tighter">Manager</span>;
+      case UserRole.RESOURCE: return <span className="text-[10px] font-bold bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded uppercase tracking-tighter">Resource</span>;
+      default: return null;
+    }
+  };
 
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden">
@@ -49,12 +70,14 @@ export const Layout: React.FC<LayoutProps> = ({
              <p className="hidden group-hover:block text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap animate-in fade-in duration-300">Overview</p>
           </div>
           
-          <NavItem 
-            icon={<LayoutDashboard size={20} />} 
-            label="Dashboard" 
-            active={currentView === 'dashboard'} 
-            onClick={() => onNavigate('dashboard')}
-          />
+          {canSeeDashboard && (
+            <NavItem 
+              icon={<LayoutDashboard size={20} />} 
+              label="Dashboard" 
+              active={currentView === 'dashboard'} 
+              onClick={() => onNavigate('dashboard')}
+            />
+          )}
           <NavItem 
             icon={<PieChart size={20} />} 
             label="Reports" 
@@ -68,24 +91,30 @@ export const Layout: React.FC<LayoutProps> = ({
              <p className="hidden group-hover:block text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap animate-in fade-in duration-300">Management</p>
           </div>
           
-          <NavItem 
-            icon={<FolderKanban size={20} />} 
-            label="Projects" 
-            active={currentView === 'projects'}
-            onClick={() => onNavigate('projects')}
-          />
-          <NavItem 
-            icon={<CheckSquare size={20} />} 
-            label="All Tasks" 
-            active={currentView === 'tasks'}
-            onClick={() => onNavigate('tasks')}
-          />
-          <NavItem 
-            icon={<Users size={20} />} 
-            label="Team" 
-            active={currentView === 'team'} 
-            onClick={() => onNavigate('team')}
-          />
+          {canSeeProjects && (
+            <NavItem 
+              icon={<FolderKanban size={20} />} 
+              label="Projects" 
+              active={currentView === 'projects'}
+              onClick={() => onNavigate('projects')}
+            />
+          )}
+          {canSeeTasks && (
+            <NavItem 
+              icon={<CheckSquare size={20} />} 
+              label="All Tasks" 
+              active={currentView === 'tasks'}
+              onClick={() => onNavigate('tasks')}
+            />
+          )}
+          {canSeeTeam && (
+            <NavItem 
+              icon={<Users size={20} />} 
+              label="Team" 
+              active={currentView === 'team'} 
+              onClick={() => onNavigate('team')}
+            />
+          )}
           <NavItem 
             icon={<Tag size={20} />} 
             label="Skills Matrix" 
@@ -106,12 +135,14 @@ export const Layout: React.FC<LayoutProps> = ({
           />
           
           <div className="mt-auto pt-6 pb-4">
-             <NavItem 
-                icon={<Settings size={20} />} 
-                label="Settings" 
-                active={currentView === 'settings'}
-                onClick={() => onNavigate('settings')}
-            />
+             {canSeeSettings && (
+               <NavItem 
+                  icon={<SettingsIcon size={20} />} 
+                  label="Settings" 
+                  active={currentView === 'settings'}
+                  onClick={() => onNavigate('settings')}
+              />
+             )}
           </div>
         </nav>
 
@@ -178,12 +209,22 @@ export const Layout: React.FC<LayoutProps> = ({
             </div>
             <div className="flex items-center gap-2">
                 <div className="text-right hidden md:block">
-                    <div className="text-sm font-medium text-slate-900">Alex Manager</div>
-                    <div className="text-xs text-slate-500">Admin</div>
+                    <div className="text-sm font-medium text-slate-900 leading-none">{user?.displayName || user?.email}</div>
+                    <div className="mt-1">{getRoleBadge(user?.role)}</div>
                 </div>
                 <div className="w-9 h-9 rounded-full bg-indigo-100 border-2 border-white shadow-sm overflow-hidden">
-                   <img src="https://ui-avatars.com/api/?name=Alex+Manager&background=6366f1&color=fff" alt="User" />
+                   <img 
+                     src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user?.displayName || user?.email || 'User')}&background=6366f1&color=fff`} 
+                     alt="User" 
+                   />
                 </div>
+                <button 
+                  onClick={onLogout}
+                  className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors ml-1"
+                  title="Logout"
+                >
+                  <LogOut size={18} />
+                </button>
             </div>
           </div>
         </header>

@@ -17,7 +17,8 @@ import { AIAssistantModal } from './components/AIAssistantModal';
 import { ResourceDetailsModal } from './components/ResourceDetailsModal';
 import { NotificationCenter } from './components/NotificationCenter';
 import { fetchSheetData } from './services/sheetService';
-import { AppState, FilterState, Resource, Task, TaskStatus, Leave, PriorityConfig, Notification, TaskHistoryItem } from './types';
+import { LoginPage } from './components/LoginPage';
+import { AppState, FilterState, Resource, Task, TaskStatus, Leave, PriorityConfig, Notification, TaskHistoryItem, UserProfile, UserRole } from './types';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
@@ -27,8 +28,11 @@ const App: React.FC = () => {
     projects: [],
     priorityConfigs: [],
     notifications: [],
+    user: null,
+    authLoading: true,
     isLoading: true,
     error: null,
+    emailRemindersEnabled: true,
   });
 
   const [filters, setFilters] = useState<FilterState>({
@@ -46,6 +50,28 @@ const App: React.FC = () => {
   const [projectsViewMode, setProjectsViewMode] = useState<'tile' | 'list'>('tile');
   const [resourceViewMode, setResourceViewMode] = useState<'tile' | 'list'>('tile');
 
+  // Local Auth Listener
+  useEffect(() => {
+    const checkAuth = () => {
+      const savedUser = localStorage.getItem('ifocus_user');
+      if (savedUser) {
+        try {
+          const user = JSON.parse(savedUser);
+          setState(prev => ({ ...prev, user, authLoading: false }));
+        } catch (e) {
+          localStorage.removeItem('ifocus_user');
+          setState(prev => ({ ...prev, authLoading: false }));
+        }
+      } else {
+        setState(prev => ({ ...prev, authLoading: false }));
+      }
+    };
+
+    // Small delay to simulate auth check
+    const timer = setTimeout(checkAuth, 500);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Load Data
   useEffect(() => {
     const loadData = async () => {
@@ -56,7 +82,8 @@ const App: React.FC = () => {
         // Extract unique projects
         const uniqueProjects = Array.from(new Set(tasks.map(t => t.projectName))).sort();
         
-        setState({
+        setState(prev => ({
+          ...prev,
           resources,
           tasks,
           leaves,
@@ -65,7 +92,8 @@ const App: React.FC = () => {
           notifications: [],
           isLoading: false,
           error: null,
-        });
+          emailRemindersEnabled: true,
+        }));
       } catch (err) {
         setState(prev => ({ 
           ...prev, 
@@ -185,13 +213,15 @@ const App: React.FC = () => {
     if (state.isLoading || state.tasks.length === 0) return;
 
     const today = new Date();
-    const threeDaysFromNow = addDays(today, 3);
     
     const deadlineNotifications: Notification[] = state.tasks
       .filter(t => t.status !== TaskStatus.COMPLETED)
       .filter(t => {
         const dueDate = parseISO(t.date);
-        return isWithinInterval(dueDate, { start: today, end: threeDaysFromNow });
+        const reminderDays = t.reminderDays ?? 3;
+        const reminderDate = addDays(today, reminderDays);
+        // Trigger if today is within the reminder window (today <= dueDate <= today + reminderDays)
+        return isWithinInterval(dueDate, { start: today, end: reminderDate });
       })
       .map(t => ({
         id: `deadline-${t.id}`,
@@ -205,10 +235,22 @@ const App: React.FC = () => {
 
     if (deadlineNotifications.length > 0) {
       setState(prev => {
-        // Only add if not already present
         const existingIds = new Set(prev.notifications.map(n => n.id));
         const newNotifications = deadlineNotifications.filter(n => !existingIds.has(n.id));
+        
         if (newNotifications.length === 0) return prev;
+
+        // Simulate Email Notifications
+        if (prev.emailRemindersEnabled) {
+          newNotifications.forEach(n => {
+            const task = prev.tasks.find(t => t.id === n.taskId);
+            const resource = prev.resources.find(r => r.id === task?.assignedResourceId);
+            if (resource?.email) {
+              console.log(`[EMAIL SIMULATION] Sending reminder to ${resource.email}: ${n.message}`);
+            }
+          });
+        }
+
         return {
           ...prev,
           notifications: [...newNotifications, ...prev.notifications]
@@ -305,6 +347,18 @@ const App: React.FC = () => {
           changedBy: 'Alex Manager'
         });
       }
+
+      // Check for reminder change
+      if (originalTask.reminderDays !== updatedTask.reminderDays) {
+        history.push({
+          id: `hist-${Date.now()}-reminder`,
+          field: 'general',
+          oldValue: `${originalTask.reminderDays ?? 3} days`,
+          newValue: `${updatedTask.reminderDays ?? 3} days`,
+          timestamp: new Date(),
+          changedBy: 'Alex Manager'
+        });
+      }
     }
 
     const taskWithHistory = { ...updatedTask, history };
@@ -341,6 +395,31 @@ const App: React.FC = () => {
       return state.leaves.some(l => l.resourceId === resourceId && l.date === dateStr);
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('ifocus_user');
+    setState(prev => ({ ...prev, user: null }));
+  };
+
+  const handleLoginSuccess = (user: UserProfile) => {
+    localStorage.setItem('ifocus_user', JSON.stringify(user));
+    setState(prev => ({ ...prev, user }));
+  };
+
+  if (state.authLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <RefreshCw className="animate-spin h-8 w-8 text-indigo-600 mx-auto mb-4" />
+          <p className="text-slate-600 font-medium">Authenticating...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!state.user) {
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+  }
+
   if (state.isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-50">
@@ -363,6 +442,8 @@ const App: React.FC = () => {
       onClearAll={handleClearAll}
       searchValue={filters.search}
       onSearchChange={(val) => setFilters(prev => ({ ...prev, search: val }))}
+      user={state.user}
+      onLogout={handleLogout}
     >
       {currentView === 'team' ? (
         <TeamView 
@@ -397,7 +478,13 @@ const App: React.FC = () => {
       ) : currentView === 'leaves' ? (
         <LeavesView leaves={state.leaves} resources={state.resources} onAddLeave={handleAddLeave} />
       ) : currentView === 'settings' ? (
-        <SettingsView priorityConfigs={state.priorityConfigs} onUpdatePriorities={handleUpdatePriorities} />
+        <SettingsView 
+          priorityConfigs={state.priorityConfigs} 
+          onUpdatePriorities={handleUpdatePriorities}
+          emailRemindersEnabled={state.emailRemindersEnabled}
+          onToggleEmailReminders={(enabled) => setState(prev => ({ ...prev, emailRemindersEnabled: enabled }))}
+          user={state.user}
+        />
       ) : currentView === 'dashboard' ? (
         <div className="max-w-7xl mx-auto pb-10 space-y-8">
           

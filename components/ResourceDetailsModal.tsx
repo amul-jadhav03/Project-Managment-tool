@@ -37,7 +37,8 @@ export const ResourceDetailsModal: React.FC<ResourceDetailsModalProps> = ({
       description: task.description,
       duration: task.duration,
       status: task.status,
-      priority: task.priority
+      priority: task.priority,
+      reminderDays: task.reminderDays ?? 3
     });
   };
 
@@ -177,6 +178,18 @@ export const ResourceDetailsModal: React.FC<ResourceDetailsModalProps> = ({
                                 {Object.values(TaskStatus).map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
                         </div>
+                        <div className="flex-1">
+                            <label className="text-xs font-semibold text-slate-500 uppercase">Reminder (days)</label>
+                            <select
+                                value={editValues.reminderDays}
+                                onChange={e => setEditValues({...editValues, reminderDays: parseInt(e.target.value)})}
+                                className="w-full text-sm border border-slate-200 rounded p-2 mt-1 bg-white"
+                            >
+                                {[1, 2, 3, 5, 7, 14].map(days => (
+                                    <option key={days} value={days}>{days}d before</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
                     
                     <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 mt-2">
@@ -218,6 +231,9 @@ export const ResourceDetailsModal: React.FC<ResourceDetailsModalProps> = ({
                     <div className="flex items-center gap-3">
                         <span className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded">
                             <Clock size={12} className="text-slate-400" /> {task.duration} hrs
+                        </span>
+                        <span className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded">
+                            <AlertCircle size={12} className="text-slate-400" /> {task.reminderDays ?? 3}d reminder
                         </span>
                         <span className="bg-blue-50 text-blue-600 px-2 py-1 rounded">
                             {task.projectName}

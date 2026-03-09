@@ -1,16 +1,31 @@
 import React, { useState } from 'react';
-import { PriorityConfig } from '../types';
-import { Save, Plus, Trash2, RotateCcw } from 'lucide-react';
+import { PriorityConfig, UserProfile, UserRole } from '../types';
+import { Save, Plus, Trash2, RotateCcw, Users, CreditCard, Briefcase, Settings as SettingsIcon } from 'lucide-react';
 import { getDefaultPriorityConfigs } from '../services/sheetService';
+import { UserManagementView } from './UserManagementView';
 
 interface SettingsViewProps {
   priorityConfigs: PriorityConfig[];
   onUpdatePriorities: (configs: PriorityConfig[]) => void;
+  emailRemindersEnabled: boolean;
+  onToggleEmailReminders: (enabled: boolean) => void;
+  user: UserProfile | null;
 }
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ priorityConfigs, onUpdatePriorities }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({ 
+  priorityConfigs, 
+  onUpdatePriorities,
+  emailRemindersEnabled,
+  onToggleEmailReminders,
+  user
+}) => {
   const [localConfigs, setLocalConfigs] = useState<PriorityConfig[]>([...priorityConfigs]);
   const [hasChanges, setHasChanges] = useState(false);
+  const [activeTab, setActiveTab] = useState<'general' | 'users' | 'billing' | 'projects'>('general');
+
+  const canManageUsers = user?.role === UserRole.SUPER_ADMIN || user?.role === UserRole.ADMIN || user?.role === UserRole.MANAGER;
+  const canManageBilling = user?.role === UserRole.SUPER_ADMIN || user?.role === UserRole.ADMIN || user?.role === UserRole.MANAGER;
+  const canManageProjects = user?.role === UserRole.SUPER_ADMIN || user?.role === UserRole.ADMIN || user?.role === UserRole.MANAGER;
 
   const handleUpdateConfig = (index: number, field: keyof PriorityConfig, value: string) => {
     const newConfigs = [...localConfigs];
@@ -47,13 +62,74 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ priorityConfigs, onU
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
-        <p className="text-slate-500">Configure application-wide preferences and task metadata.</p>
+    <div className="max-w-5xl mx-auto space-y-8">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
+          <p className="text-slate-500">Configure application preferences and administrative tasks.</p>
+        </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+        <button 
+          onClick={() => setActiveTab('general')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'general' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+        >
+          <SettingsIcon size={16} /> General
+        </button>
+        {canManageUsers && (
+          <button 
+            onClick={() => setActiveTab('users')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'users' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            <Users size={16} /> Users
+          </button>
+        )}
+        {canManageProjects && (
+          <button 
+            onClick={() => setActiveTab('projects')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'projects' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            <Briefcase size={16} /> Projects
+          </button>
+        )}
+        {canManageBilling && (
+          <button 
+            onClick={() => setActiveTab('billing')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'billing' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            <CreditCard size={16} /> Billing
+          </button>
+        )}
+      </div>
+
+      {activeTab === 'users' && user ? (
+        <UserManagementView currentUser={user} />
+      ) : activeTab === 'projects' ? (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
+          <Briefcase size={48} className="mx-auto text-slate-300 mb-4" />
+          <h2 className="text-xl font-bold text-slate-900">Project Administration</h2>
+          <p className="text-slate-500 mt-2">
+            {user?.role === UserRole.SUPER_ADMIN 
+              ? 'As Super Admin, you can manage all projects and budgets.' 
+              : 'As Admin/Manager, you can manage assigned projects and budgets.'}
+          </p>
+          <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-dashed border-slate-200 inline-block">
+            <p className="text-xs text-slate-400 font-mono italic">Project Budgeting Module Loading...</p>
+          </div>
+        </div>
+      ) : activeTab === 'billing' ? (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
+          <CreditCard size={48} className="mx-auto text-slate-300 mb-4" />
+          <h2 className="text-xl font-bold text-slate-900">Billing & Subscription</h2>
+          <p className="text-slate-500 mt-2">Manage your subscription, payment methods, and invoices.</p>
+          <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-dashed border-slate-200 inline-block">
+            <p className="text-xs text-slate-400 font-mono italic">Billing Gateway Integration Pending...</p>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-8">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-slate-800">Task Priorities</h2>
@@ -156,6 +232,33 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ priorityConfigs, onU
         </div>
       </div>
 
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-slate-100">
+          <h2 className="text-lg font-bold text-slate-800">Notification Settings</h2>
+          <p className="text-sm text-slate-500">Configure how and when you receive task reminders.</p>
+        </div>
+        <div className="p-6 space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <h3 className="text-sm font-bold text-slate-700">Email Reminders</h3>
+              <p className="text-xs text-slate-500">Send automated email notifications for upcoming task deadlines.</p>
+            </div>
+            <button 
+              onClick={() => onToggleEmailReminders(!emailRemindersEnabled)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+                emailRemindersEnabled ? 'bg-indigo-600' : 'bg-slate-200'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  emailRemindersEnabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 flex gap-4">
         <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
           <Save className="text-amber-600" size={20} />
@@ -167,6 +270,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ priorityConfigs, onU
           </p>
         </div>
       </div>
+        </div>
+      )}
     </div>
   );
 };

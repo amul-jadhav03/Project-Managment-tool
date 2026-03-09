@@ -43,6 +43,15 @@ export const TasksView: React.FC<TasksViewProps> = ({ tasks, resources, priority
     }
   };
 
+  const handleReminderChange = (task: Task, days: number) => {
+    if (onUpdateTask) {
+      onUpdateTask({
+        ...task,
+        reminderDays: days
+      });
+    }
+  };
+
   const projects = useMemo(() => {
     return Array.from(new Set(tasks.map(t => t.projectName))).sort();
   }, [tasks]);
@@ -161,6 +170,9 @@ export const TasksView: React.FC<TasksViewProps> = ({ tasks, resources, priority
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('date')}>
                   <div className="flex items-center gap-2">Due Date <ArrowUpDown size={12}/></div>
                 </th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  <div className="flex items-center gap-2">Reminder <Clock size={12}/></div>
+                </th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('priority')}>
                   <div className="flex items-center gap-2">Priority <ArrowUpDown size={12}/></div>
                 </th>
@@ -196,6 +208,19 @@ export const TasksView: React.FC<TasksViewProps> = ({ tasks, resources, priority
                       <div className="flex items-center gap-2 text-sm text-slate-500">
                         <Calendar size={14} className="text-slate-400" />
                         {format(parseISO(task.date), 'MMM d, yyyy')}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-1.5">
+                        <select
+                          value={task.reminderDays ?? 3}
+                          onChange={(e) => handleReminderChange(task, parseInt(e.target.value))}
+                          className="bg-slate-50 border border-slate-200 rounded px-1.5 py-1 text-[10px] font-bold text-slate-600 focus:ring-1 focus:ring-indigo-500 outline-none cursor-pointer"
+                        >
+                          {[1, 2, 3, 5, 7, 14].map(days => (
+                            <option key={days} value={days}>{days}d before</option>
+                          ))}
+                        </select>
                       </div>
                     </td>
                     <td className="px-6 py-4">
